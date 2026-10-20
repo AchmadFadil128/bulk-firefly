@@ -1,0 +1,5 @@
+.git
+.env
+secrets
+README.md
+compose*.yaml

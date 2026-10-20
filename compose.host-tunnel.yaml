@@ -1,0 +1,6 @@
+# Production variant when cloudflared runs directly on the host, not in Docker.
+# The port remains bound to loopback only and APP_ENV stays production.
+services:
+  bulk-firefly:
+    ports:
+      - "127.0.0.1:8088:8080"

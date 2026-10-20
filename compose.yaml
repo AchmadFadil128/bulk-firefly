@@ -1,0 +1,46 @@
+services:
+  bulk-firefly:
+    build: .
+    image: bulk-firefly:local
+    container_name: bulk-firefly
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      APP_TIMEZONE: Asia/Jakarta
+      FIREFLY_BASE_URL: ${FIREFLY_BASE_URL:-https://finance.achmad128.my.id/api}
+      FIREFLY_API_TOKEN_FILE: /run/secrets/firefly_api_token
+      FIREFLY_CF_ACCESS_CLIENT_ID_FILE: /run/secrets/firefly_cf_access_client_id
+      FIREFLY_CF_ACCESS_CLIENT_SECRET_FILE: /run/secrets/firefly_cf_access_client_secret
+    secrets:
+      - firefly_api_token
+      - firefly_cf_access_client_id
+      - firefly_cf_access_client_secret
+    expose:
+      - "8080"
+    networks:
+      - bulk-firefly-net
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+      - /var/run/apache2:rw,noexec,nosuid,size=16m
+      - /var/lock/apache2:rw,noexec,nosuid,size=16m
+    healthcheck:
+      test: ["CMD", "php", "-r", "$$s=@fsockopen('127.0.0.1',8080); if($$s){fclose($$s); exit(0);} exit(1);"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+secrets:
+  firefly_api_token:
+    file: ./secrets/firefly_api_token
+  firefly_cf_access_client_id:
+    file: ./secrets/firefly_cf_access_client_id
+  firefly_cf_access_client_secret:
+    file: ./secrets/firefly_cf_access_client_secret
+
+networks:
+  bulk-firefly-net:
+    name: bulk-firefly-net

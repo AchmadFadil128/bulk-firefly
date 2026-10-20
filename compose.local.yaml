@@ -1,0 +1,8 @@
+# Local testing only. The app is published on loopback, not on all interfaces.
+services:
+  bulk-firefly:
+    environment:
+      APP_ENV: local
+    ports:
+      - "127.0.0.1:8088:8080"
+    read_only: false
