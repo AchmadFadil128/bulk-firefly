@@ -15,8 +15,8 @@ services:
       - firefly_api_token
       - firefly_cf_access_client_id
       - firefly_cf_access_client_secret
-    expose:
-      - "8080"
+    ports:
+      - "${APP_PORT:-8088}:8080"
     networks:
       - bulk-firefly-net
     security_opt:

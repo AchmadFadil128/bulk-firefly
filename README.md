@@ -50,66 +50,56 @@ If `finance.achmad128.my.id` itself is protected by Cloudflare Access, create a 
 
 ## 2. Build and run
 
-Production-style Compose does **not** publish a host port. The app is only reachable by containers connected to the Docker network `bulk-firefly-net`:
-
 ```bash
 docker compose up -d --build
 docker compose ps
 docker compose logs -f bulk-firefly
 ```
 
-The container exposes port `8080` only on the Docker network. It uses a read-only root filesystem and temporary writable mounts for Apache/PHP runtime files.
+Aplikasi mengekspos port `8088` (dapat diubah via `APP_PORT` di `.env`) ke level host VM. Kontainer tetap menggunakan *read-only root filesystem* dan temporary writable mounts untuk Apache/PHP demi keamanan.
 
-## 3. Connect your existing Cloudflare Tunnel
+## 3. Integrasi Homelab (SafeLine WAF, Cloudflare Tunnel & Tailscale)
 
-Use a separate hostname for this app. The hostname `finance.achmad128.my.id` is configured as the Firefly III API origin, so do not point the bulk app at the same hostname unless you intentionally want to replace that hostname's current service. For example, you could use `bulk-finance.achmad128.my.id` if that hostname is available and configured in your Cloudflare zone.
+Sesuai dengan arsitektur homelab di [ARCHITECTURE.md](file:///home/achmad/Documents/PersonalProject/bulk-firefly/ARCHITECTURE.md):
 
-1. Create a distinct public hostname for the bulk app in Cloudflare Tunnel, for example `bulk-finance.achmad128.my.id` if available in your Cloudflare zone.
-2. Configure the Tunnel service/origin as:
+1. **SafeLine WAF (Reverse Proxy & Proteksi)**:
+   - Buat aplikasi/proxy upstream baru di SafeLine WAF.
+   - Konfigurasikan target upstream origin ke:
+     ```text
+     http://127.0.0.1:8088
+     ```
+   - SafeLine mendengarkan pada port 80/443 di host VM dan bertindak sebagai gerbang inspeksi WAF.
 
-   ```text
-   http://bulk-firefly:8080
-   ```
+2. **Cloudflare Tunnel (`cloudflared` systemd service)**:
+   - Proses `cloudflared` berjalan langsung pada host VM sebagai systemd service (bukan container).
+   - Buat hostname publik (misalnya `bulk-finance.achmad128.my.id`) di dashboard Cloudflare Tunnel.
+   - Arahkan service origin hostname tersebut ke SafeLine WAF (contoh: `http://127.0.0.1:80` atau `https://127.0.0.1:443`), **bukan** langsung ke container aplikasi.
+   - Aktifkan Cloudflare Access jika ingin membatasi akses publik berdasarkan identitas/email Anda.
 
-3. Ensure the existing `cloudflared` container is connected to the same Docker network. Find its container name, then run:
+3. **Akses Administrator & Troubleshooting via Tailscale**:
+   - VM tidak memiliki IP publik sehingga aman dari pemindaian langsung dari Internet.
+   - Administrator yang terhubung ke jaringan Tailscale dapat mengakses aplikasi secara langsung melalui:
+     ```text
+     http://<IP-TAILSCALE-VM>:8088
+     ```
+   - Mode ini sangat memudahkan debugging, pengujian endpoint, dan troubleshooting tanpa terhalang filter WAF atau proxy.
 
-   ```bash
-   docker network connect bulk-firefly-net <cloudflared-container-name>
-   ```
+## 4. Local test / Development (opsional)
 
-   If it is already connected, Docker may report that it is already connected; that is fine. For a persistent setup, add `bulk-firefly-net` as an external network to the existing cloudflared service in its Compose file, then recreate that service. If your Tunnel runs directly on the host rather than in a container, use `compose.host-tunnel.yaml` (instructions below) and point the Tunnel at `http://127.0.0.1:8088`. Do not expose port 8080 publicly.
-
-4. Create a Cloudflare Access self-hosted application for the **bulk app hostname**, with an allow policy limited to your identity/email. Protect the hostname before sharing it.
-5. Ensure Cloudflare WAF/security rules are enabled as appropriate for that hostname. Cloudflare Access is the authentication gate; WAF is an additional layer, not a replacement for Access.
-6. Open the new bulk app hostname. The browser should be redirected to Cloudflare Access before the app is served.
-
-The app uses a same-origin CSRF token and checks the `Origin` header on transaction writes. Do not publish the PHP origin directly around Cloudflare Access. The Compose file intentionally has no `ports:` mapping in its production configuration.
-
-## 4. If cloudflared runs directly on the host
-
-Use the production override to bind the app to loopback only while keeping production cookie/security settings:
+Jika ingin menjalankan untuk testing lokal langsung di mesin ini:
 
 ```bash
-docker compose -f compose.yaml -f compose.host-tunnel.yaml up -d --build
+docker compose up -d --build
 ```
 
-Configure the host's cloudflared origin as `http://127.0.0.1:8088`. Do not use this variant if your `cloudflared` runs in a container; use the shared Docker network setup above instead.
+Buka langsung di browser: `http://127.0.0.1:8088`.
 
-## 5. Local smoke test (optional)
-
-For a temporary local-only test, use the override file. It binds to `127.0.0.1`, not all network interfaces:
+Jika ingin menjalankan dalam mode development non-read-only filesystem:
 
 ```bash
 docker compose -f compose.yaml -f compose.local.yaml up -d --build
 ```
 
-Open `http://127.0.0.1:8088`. Stop it with:
-
-```bash
-docker compose -f compose.yaml -f compose.local.yaml down
-```
-
-The local override changes the session cookie setting for HTTP testing. Do not use the local override on a public server. API calls still go to the configured Firefly III URL and require a valid token.
 
 ## Spreadsheet paste format
 

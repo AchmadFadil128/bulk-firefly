@@ -22,7 +22,7 @@ $csrf = htmlspecialchars(csrf_token(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         <p class="eyebrow">FIREFLY III · PERSONAL FINANCE</p>
         <h1>Bulk Transaction</h1>
       </div>
-      <div class="secure-pill"><span class="secure-dot"></span> Protected by Access</div>
+      <div class="secure-pill"><span class="secure-dot"></span> Protected by SafeLine WAF</div>
     </header>
 
     <section class="intro-row">
